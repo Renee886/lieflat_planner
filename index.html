@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>LieFlat Planner</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Bhai+2&display=swap" rel="stylesheet">
+
+<style>
+
+:root{
+--bg:#ffffff;
+--text:#000000;
+--card:#f2f2f2;
+}
+
+body{
+margin:0;
+font-family:'Baloo Bhai 2',cursive;
+background:var(--bg);
+color:var(--text);
+display:flex;
+height:100vh;
+overflow:hidden;
+}
+
+/* Sidebar */
+
+#sidebar{
+width:200px;
+background:var(--card);
+padding:10px;
+display:flex;
+flex-direction:column;
+}
+
+#sidebar h2{
+text-align:center;
+margin-bottom:10px;
+}
+
+#sidebar button{
+padding:10px;
+margin:5px 0;
+border:none;
+border-radius:8px;
+cursor:pointer;
+font-size:15px;
+}
+
+/* Main */
+
+#main{
+flex:1;
+padding:20px;
+overflow:auto;
+}
+
+.hidden{display:none;}
+
+.card{
+background:var(--card);
+padding:10px;
+border-radius:12px;
+margin:10px 0;
+}
+
+input,textarea{
+width:100%;
+padding:8px;
+margin:5px 0;
+border-radius:6px;
+border:1px solid #aaa;
+}
+
+button.add-btn{
+background:#ff69b4;
+color:white;
+border:none;
+padding:8px;
+border-radius:8px;
+cursor:pointer;
+}
+
+.deleteBtn{
+background:#ff4d4d;
+color:white;
+border:none;
+padding:2px 6px;
+border-radius:6px;
+cursor:pointer;
+font-size:10px;
+float:right;
+}
+
+/* avatar */
+
+#avatarPreview{
+width:80px;
+height:80px;
+border-radius:50%;
+object-fit:cover;
+border:2px solid #aaa;
+margin-bottom:10px;
+}
+
+/* Calendar */
+
+#calendarGrid{
+display:grid;
+grid-template-columns:repeat(7,1fr);
+gap:6px;
+}
+
+.day{
+background:var(--card);
+min-height:110px;
+padding:5px;
+border-radius:10px;
+font-size:12px;
+}
+
+.dayHeader{
+font-weight:bold;
+margin-bottom:4px;
+}
+
+.taskItem{
+background:#ffc0cb;
+padding:4px;
+margin:3px 0;
+border-radius:6px;
+cursor:grab;
+font-size:11px;
+}
+
+.taskTime{
+font-size:10px;
+opacity:0.8;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="sidebar">
+
+<h2>LieFlat Planner</h2>
+
+<button onclick="showSection('calendar')">Calendar</button>
+<button onclick="showSection('addTask')">Add Task</button>
+<button onclick="showSection('today')">Today's Tasks</button>
+<button onclick="showSection('settings')">Settings</button>
+
+</div>
+
+<div id="main">
+
+<!-- Calendar -->
+
+<div id="calendar">
+
+<h2>Calendar</h2>
+
+<div style="display:flex;justify-content:space-between;margin-bottom:10px">
+
+<button onclick="prevMonth()">Prev</button>
+
+<h3 id="monthLabel"></h3>
+
+<button onclick="nextMonth()">Next</button>
+
+</div>
+
+<div id="calendarGrid"></div>
+
+</div>
+
+<!-- Add Task -->
+
+<div id="addTask" class="hidden">
+
+<h2>Add Task</h2>
+
+<input id="taskTitle" placeholder="Task name">
+
+<input type="date" id="taskDate">
+
+<input type="time" id="taskStart">
+
+<input type="time" id="taskEnd">
+
+<button class="add-btn" onclick="addTask()">Add Task</button>
+
+</div>
+
+<!-- Today -->
+
+<div id="today" class="hidden">
+
+<h2>Today's Tasks</h2>
+
+<div id="todayList"></div>
+
+</div>
+
+<!-- Settings -->
+
+<div id="settings" class="hidden">
+
+<h2>Settings</h2>
+
+<h3>Account</h3>
+
+<img id="avatarPreview">
+
+<input type="file" accept="image/*" onchange="uploadAvatar(event)">
+
+<input id="usernameInput" placeholder="Username">
+
+<input id="passwordInput" type="password" placeholder="Password">
+
+<button class="add-btn" onclick="registerUser()">Save User</button>
+
+<p id="currentUserInfo"></p>
+
+<h3>Theme</h3>
+
+<button onclick="setTheme('light')">Light</button>
+<button onclick="setTheme('dark')">Dark</button>
+<button onclick="setTheme('pink')">Pink</button>
+
+</div>
+
+</div>
+
+<script>
+
+/* section switching */
+
+function showSection(id){
+
+["calendar","addTask","today","settings"].forEach(sec=>{
+document.getElementById(sec).classList.add("hidden")
+})
+
+document.getElementById(id).classList.remove("hidden")
+
+}
+
+/* tasks */
+
+let tasks = JSON.parse(localStorage.getItem("tasks")) || []
+
+function saveTasks(){
+localStorage.setItem("tasks",JSON.stringify(tasks))
+}
+
+/* add task */
+
+function addTask(){
+
+let title=document.getElementById("taskTitle").value
+let date=document.getElementById("taskDate").value
+let start=document.getElementById("taskStart").value
+let end=document.getElementById("taskEnd").value
+
+if(!title||!date) return
+
+tasks.push({
+title,
+date,
+start,
+end,
+completed:false
+})
+
+saveTasks()
+
+renderCalendar()
+renderToday()
+
+}
+
+/* delete */
+
+function deleteTask(i){
+
+tasks.splice(i,1)
+
+saveTasks()
+
+renderCalendar()
+renderToday()
+
+}
+
+/* today tasks */
+
+function renderToday(){
+
+let today=new Date().toISOString().split("T")[0]
+
+let list=document.getElementById("todayList")
+
+list.innerHTML=""
+
+tasks.forEach((task,i)=>{
+
+if(task.date===today){
+
+let div=document.createElement("div")
+
+div.className="card"
+
+div.innerHTML=`
+<b>${task.title}</b><br>
+${task.start} - ${task.end}
+<br>
+<button onclick="deleteTask(${i})">Delete</button>
+`
+
+list.appendChild(div)
+
+}
+
+})
+
+}
+
+/* calendar */
+
+let currentMonth=new Date().getMonth()
+let currentYear=new Date().getFullYear()
+
+function renderCalendar(){
+
+let grid=document.getElementById("calendarGrid")
+grid.innerHTML=""
+
+let firstDay=new Date(currentYear,currentMonth,1).getDay()
+let days=new Date(currentYear,currentMonth+1,0).getDate()
+
+document.getElementById("monthLabel").innerText=
+new Date(currentYear,currentMonth).toLocaleString('default',{month:'long',year:'numeric'})
+
+for(let i=0;i<firstDay;i++){
+grid.appendChild(document.createElement("div"))
+}
+
+for(let d=1;d<=days;d++){
+
+let date=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`
+
+let day=document.createElement("div")
+day.className="day"
+
+day.innerHTML=`<div class="dayHeader">${d}</div>`
+
+day.addEventListener("dragover",e=>e.preventDefault())
+
+day.addEventListener("drop",e=>{
+
+let index=e.dataTransfer.getData("taskIndex")
+
+tasks[index].date=date
+
+saveTasks()
+
+renderCalendar()
+renderToday()
+
+})
+
+tasks.forEach((task,i)=>{
+
+if(task.date===date){
+
+let t=document.createElement("div")
+t.className="taskItem"
+t.draggable=true
+
+t.innerHTML=`
+<button class="deleteBtn" onclick="deleteTask(${i})">x</button>
+<b>${task.title}</b>
+<div class="taskTime">${task.start} - ${task.end}</div>
+`
+
+t.addEventListener("dragstart",e=>{
+e.dataTransfer.setData("taskIndex",i)
+})
+
+day.appendChild(t)
+
+}
+
+})
+
+grid.appendChild(day)
+
+}
+
+}
+
+/* month navigation */
+
+function prevMonth(){
+
+currentMonth--
+
+if(currentMonth<0){
+currentMonth=11
+currentYear--
+}
+
+renderCalendar()
+
+}
+
+function nextMonth(){
+
+currentMonth++
+
+if(currentMonth>11){
+currentMonth=0
+currentYear++
+}
+
+renderCalendar()
+
+}
+
+/* theme */
+
+function setTheme(t){
+
+if(t==="dark"){
+document.documentElement.style.setProperty("--bg","#1c1c1c")
+document.documentElement.style.setProperty("--text","#fff")
+document.documentElement.style.setProperty("--card","#333")
+}
+
+if(t==="pink"){
+document.documentElement.style.setProperty("--bg","#ffe6f2")
+document.documentElement.style.setProperty("--text","#99004d")
+document.documentElement.style.setProperty("--card","#ffccdf")
+}
+
+if(t==="light"){
+document.documentElement.style.setProperty("--bg","#fff")
+document.documentElement.style.setProperty("--text","#000")
+document.documentElement.style.setProperty("--card","#f2f2f2")
+}
+
+}
+
+/* user */
+
+let currentUser=JSON.parse(localStorage.getItem("user"))||null
+
+function uploadAvatar(e){
+
+let reader=new FileReader()
+
+reader.onload=function(){
+document.getElementById("avatarPreview").src=reader.result
+}
+
+reader.readAsDataURL(e.target.files[0])
+
+}
+
+function registerUser(){
+
+let username=document.getElementById("usernameInput").value
+let password=document.getElementById("passwordInput").value
+let avatar=document.getElementById("avatarPreview").src
+
+currentUser={username,password,avatar}
+
+localStorage.setItem("user",JSON.stringify(currentUser))
+
+document.getElementById("currentUserInfo").innerText="Logged in as "+username
+
+}
+
+/* init */
+
+renderCalendar()
+renderToday()
+
+</script>
+
+</body>
+</html>
